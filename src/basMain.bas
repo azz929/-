@@ -49,6 +49,19 @@ End Sub
 
 '================= أدوات مساعدة عامة =========================
 
+' فك ترميز نص يونيكود من رموز سداسية عشرية مفصولة بمسافات
+' تُستخدم في الملفات المحوّلة (dist) لضمان سلامة النصوص العربية
+' على أي جهاز مهما كانت لغة النظام
+Public Function U(sCodes As String) As String
+    Dim parts() As String, i As Long, sOut As String
+    If Len(sCodes) = 0 Then Exit Function
+    parts = Split(sCodes, " ")
+    For i = LBound(parts) To UBound(parts)
+        sOut = sOut & ChrW$(CLng("&H" & parts(i)))
+    Next i
+    U = sOut
+End Function
+
 Public Sub DropTableIfExists(sName As String)
     On Error Resume Next
     CurrentDb.TableDefs.Delete sName

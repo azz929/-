@@ -7,7 +7,7 @@
 #    powershell -ExecutionPolicy Bypass -File Build-Accdb.ps1
 #
 #  ماذا يفعل السكربت؟
-#    1) يحوّل ملفات الوحدات إلى ترميز Windows-1256
+#    1) يجهّز ملفات الوحدات بصيغة آمنة الترميز (ASCII)
 #    2) ينشئ قاعدة بيانات جديدة (المكاتبات.accdb)
 #    3) يستورد وحدات VBA تلقائياً
 #    4) يشغّل إجراء البناء لإنشاء الجداول والاستعلامات
@@ -29,14 +29,11 @@ if (Test-Path $dbPath) {
     exit 1
 }
 
-# ----- 1) تحويل الترميز إلى Windows-1256 -----
-New-Item -ItemType Directory -Force -Path $distDir | Out-Null
-$enc1256 = [System.Text.Encoding]::GetEncoding(1256)
-Get-ChildItem -Path $srcDir -Filter *.bas | ForEach-Object {
-    $text = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
-    [System.IO.File]::WriteAllText((Join-Path $distDir $_.Name), $text, $enc1256)
-}
-Write-Host "1/4  تم تحويل ترميز الوحدات" -ForegroundColor Green
+# ----- 1) تجهيز الوحدات بصيغة آمنة الترميز (ASCII فقط) -----
+# النصوص العربية تتحول إلى رموز يونيكود تُفك وقت التشغيل،
+# فتعمل بشكل سليم على أي جهاز مهما كانت لغة النظام.
+& (Join-Path $root "tools\Convert-Modules.ps1") -SrcDir $srcDir -DstDir $distDir | Out-Null
+Write-Host "1/4  تم تجهيز الوحدات (ترميز آمن)" -ForegroundColor Green
 
 # ----- 2) تشغيل Access وإنشاء قاعدة البيانات -----
 try {
