@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نظام إدارة المكاتبات</title>
+<style>
+/* ===================== أساسيات ===================== */
+:root{
+  --accent:#1f4e79; --accent-soft:#e8f1fb;
+  --ink:#1c2733; --ink-2:#4a5a6a; --ink-3:#8494a4;
+  --surface:#f4f6f9; --card:#ffffff; --line:#dde4ec;
+  --ok-bg:#e6f6ea; --ok-ink:#1e6b34;
+  --warn-bg:#fdf3e0; --warn-ink:#8a5a00;
+  --info-bg:#e8f1fb; --info-ink:#1a5089;
+  --muted-bg:#eef0f3; --muted-ink:#555f6a;
+  --bad-bg:#fdecec; --bad-ink:#a03030;
+  --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+  background:var(--surface); color:var(--ink); font-size:15px;
+}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px}
+
+/* ===================== الشريط العلوي ===================== */
+.topbar{
+  background:var(--accent); color:#fff; padding:0 20px;
+  display:flex; align-items:center; gap:24px; flex-wrap:wrap;
+}
+.topbar h1{font-size:18px; padding:14px 0}
+.tabs{display:flex; gap:4px}
+.tabs button{
+  background:transparent; border:none; color:#cfe0f0;
+  padding:16px 14px; font-size:14.5px; border-bottom:3px solid transparent;
+}
+.tabs button:hover{color:#fff}
+.tabs button.active{color:#fff; border-bottom-color:#ffd76e; font-weight:600}
+main{max-width:1180px; margin:22px auto; padding:0 16px}
+
+/* ===================== بطاقات وإحصائيات ===================== */
+.card{
+  background:var(--card); border:1px solid var(--line);
+  border-radius:var(--radius); padding:18px; margin-bottom:18px;
+}
+.card h2{font-size:16px; margin-bottom:14px; color:var(--accent)}
+.tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:18px}
+.tile{
+  background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+  padding:16px 18px;
+}
+.tile .num{font-size:30px; font-weight:700; color:var(--accent)}
+.tile .lbl{color:var(--ink-2); font-size:13.5px; margin-top:2px}
+.tile.late .num{color:var(--bad-ink)}
+
+/* ===================== أزرار ===================== */
+.btn{
+  border:1px solid var(--line); background:var(--card); color:var(--ink);
+  padding:8px 14px; border-radius:8px; font-size:14px;
+}
+.btn:hover{background:var(--surface)}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+.btn.primary:hover{background:#173d5f}
+.btn.danger{color:var(--bad-ink); border-color:#eacaca}
+.btn.danger:hover{background:var(--bad-bg)}
+.btn:disabled{opacity:.5; cursor:not-allowed}
+
+/* ===================== شريط الأدوات والجداول ===================== */
+.toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px}
+.toolbar input[type=search]{
+  padding:8px 12px; border:1px solid var(--line); border-radius:8px; min-width:220px;
+}
+.toolbar select{padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:#fff}
+.spacer{flex:1}
+table{width:100%; border-collapse:collapse; background:var(--card)}
+th,td{padding:9px 10px; text-align:right; border-bottom:1px solid var(--line); font-size:13.5px}
+th{
+  color:var(--ink-2); font-weight:600; background:#f8fafc; white-space:nowrap;
+  user-select:none;
+}
+th.sortable{cursor:pointer}
+th.sortable:hover{color:var(--accent)}
+th .arrow{font-size:10px; color:var(--accent)}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--accent-soft)}
+.table-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius)}
+.table-wrap table{border-radius:var(--radius)}
+.badge{
+  display:inline-block; padding:2px 10px; border-radius:20px; font-size:12px; font-weight:600;
+  white-space:nowrap;
+}
+.b-new{background:var(--info-bg); color:var(--info-ink)}
+.b-progress{background:var(--warn-bg); color:var(--warn-ink)}
+.b-done{background:var(--ok-bg); color:var(--ok-ink)}
+.b-archived{background:var(--muted-bg); color:var(--muted-ink)}
+.b-late{background:var(--bad-bg); color:var(--bad-ink)}
+.b-in{background:var(--ok-bg); color:var(--ok-ink)}
+.b-out{background:var(--info-bg); color:var(--info-ink)}
+.pager{display:flex; gap:6px; align-items:center; justify-content:center; margin-top:12px; color:var(--ink-2); font-size:13.5px}
+.empty{padding:40px; text-align:center; color:var(--ink-3)}
+
+/* ===================== النافذة المنبثقة ===================== */
+.overlay{
+  position:fixed; inset:0; background:rgba(20,30,40,.45); display:none;
+  align-items:flex-start; justify-content:center; padding:30px 14px; overflow:auto; z-index:50;
+}
+.overlay.open{display:flex}
+.modal{
+  background:#fff; border-radius:12px; width:860px; max-width:100%;
+  box-shadow:0 12px 40px rgba(0,0,0,.25);
+}
+.modal header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px; border-bottom:1px solid var(--line);
+}
+.modal header h3{font-size:16px; color:var(--accent)}
+.modal .body{padding:18px 20px}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px 16px}
+.field{display:flex; flex-direction:column; gap:5px}
+.field.full{grid-column:1/-1}
+.field label{font-size:13px; color:var(--ink-2); font-weight:600}
+.field input,.field select,.field textarea{
+  padding:8px 10px; border:1px solid var(--line); border-radius:8px;
+}
+.field textarea{min-height:80px; resize:vertical}
+.modal footer{
+  display:flex; gap:8px; padding:14px 20px; border-top:1px solid var(--line); flex-wrap:wrap;
+}
+.counter{color:var(--ink-2); font-size:13px; align-self:center}
+
+/* ===================== عناصر متفرقة ===================== */
+#toast{
+  position:fixed; bottom:22px; right:50%; transform:translateX(50%);
+  background:var(--ink); color:#fff; padding:10px 20px; border-radius:8px;
+  font-size:14px; display:none; z-index:99;
+}
+.banner{
+  background:#fff8e6; border:1px solid #eedFA9; color:#7a5b00;
+  border-radius:var(--radius); padding:10px 16px; margin-bottom:16px;
+  display:none; align-items:center; gap:10px; font-size:13.5px;
+}
+.banner.show{display:flex}
+.lookup-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px}
+@media (max-width:760px){ .lookup-grid,.grid2{grid-template-columns:1fr} }
+.lookup-add{display:flex; gap:8px; margin-bottom:12px}
+.lookup-add input{flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:8px}
+ul.lookup{list-style:none}
+ul.lookup li{
+  display:flex; align-items:center; gap:8px; padding:8px 4px;
+  border-bottom:1px solid var(--line); font-size:14px;
+}
+ul.lookup li .nm{flex:1}
+ul.lookup li .cnt{color:var(--ink-3); font-size:12px}
+.mini{padding:3px 9px; font-size:12.5px; border-radius:6px}
+.view{display:none}
+.view.active{display:block}
+.hint{color:var(--ink-3); font-size:12.5px; margin-top:8px}
+
+/* ===================== الطباعة ===================== */
+#printReport{display:none}
+@media print{
+  body>*{display:none !important}
+  #printReport{display:block !important}
+  #printReport h1{font-size:18px; margin-bottom:4px}
+  #printReport .meta{font-size:12px; color:#444; margin-bottom:12px}
+  #printReport table{width:100%; border-collapse:collapse}
+  #printReport th,#printReport td{
+    border:1px solid #999; padding:5px 7px; font-size:11.5px; text-align:right;
+  }
+  #printReport th{background:#eee}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>&#128236; نظام إدارة المكاتبات</h1>
+  <nav class="tabs">
+    <button data-view="dashboard" class="active">لوحة التحكم</button>
+    <button data-view="records">سجل المكاتبات</button>
+    <button data-view="lookups">الجهات والتصنيفات</button>
+    <button data-view="backup">النسخ الاحتياطي والسجل</button>
+  </nav>
+</header>
+
+<main>
+  <div class="banner" id="backupBanner">
+    &#9888;&#65039; لديك تعديلات كثيرة منذ آخر نسخة احتياطية — يُنصح بأخذ نسخة الآن.
+    <button class="btn mini" onclick="app.exportJSON()">تصدير نسخة احتياطية</button>
+  </div>
+
+  <!-- ================= لوحة التحكم ================= -->
+  <section class="view active" id="view-dashboard">
+    <div class="tiles">
+      <div class="tile"><div class="num" id="statAll">0</div><div class="lbl">إجمالي المكاتبات</div></div>
+      <div class="tile"><div class="num" id="statIn">0</div><div class="lbl">الوارد</div></div>
+      <div class="tile"><div class="num" id="statOut">0</div><div class="lbl">الصادر</div></div>
+      <div class="tile late"><div class="num" id="statLate">0</div><div class="lbl">متأخرة عن الاستحقاق</div></div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar" style="margin-bottom:0">
+        <button class="btn primary" onclick="app.newRecord()">&#10133; تسجيل مكاتبة جديدة</button>
+        <button class="btn" onclick="app.gotoRecords('')">عرض السجل الكامل</button>
+        <button class="btn" onclick="app.gotoRecords('late')">عرض المتأخرة</button>
+        <button class="btn" onclick="app.printReport()">&#128424;&#65039; طباعة تقرير</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>أحدث المكاتبات</h2>
+      <div class="table-wrap"><table id="recentTable">
+        <thead><tr><th>الرقم</th><th>التاريخ</th><th>النوع</th><th>الجهة</th><th>الموضوع</th><th>الحالة</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <h2>إحصائية شهرية</h2>
+      <div class="table-wrap"><table id="monthlyTable">
+        <thead><tr><th>الشهر</th><th>وارد</th><th>صادر</th><th>الإجمالي</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- ================= سجل المكاتبات ================= -->
+  <section class="view" id="view-records">
+    <div class="card">
+      <div class="toolbar">
+        <input type="search" id="q" placeholder="&#128269; بحث: رقم / موضوع / جهة / ملاحظات">
+        <select id="fType">
+          <option value="">كل الأنواع</option><option>وارد</option><option>صادر</option>
+        </select>
+        <select id="fCat"><option value="">كل التصنيفات</option></select>
+        <select id="fStatus">
+          <option value="">كل الحالات</option>
+          <option>جديد</option><option>قيد الإجراء</option><option>منجز</option><option>محفوظ</option>
+          <option value="__late__">المتأخرة فقط</option>
+        </select>
+        <button class="btn" onclick="app.clearFilters()">عرض الكل</button>
+        <span class="spacer"></span>
+        <button class="btn" onclick="app.exportExcel()">&#11123; تصدير Excel</button>
+        <button class="btn" onclick="app.printReport()">&#128424;&#65039; طباعة</button>
+        <button class="btn primary" onclick="app.newRecord()">&#10133; جديدة</button>
+      </div>
+      <div class="table-wrap"><table id="recTable">
+        <thead><tr>
+          <th class="sortable" data-sort="refNumber">الرقم <span class="arrow"></span></th>
+          <th class="sortable" data-sort="corrDate">التاريخ <span class="arrow"></span></th>
+          <th>النوع</th><th>التصنيف</th><th>الجهة</th>
+          <th class="sortable" data-sort="subject">الموضوع <span class="arrow"></span></th>
+          <th>الأولوية</th><th>الحالة</th>
+          <th class="sortable" data-sort="dueDate">الاستحقاق <span class="arrow"></span></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div class="pager" id="pager"></div>
+      <div class="hint">اضغط على أي سطر لفتح المكاتبة وتعديلها. اضغط على عناوين الأعمدة (الرقم/التاريخ/الموضوع/الاستحقاق) للفرز.</div>
+    </div>
+  </section>
+
+  <!-- ================= الجهات والتصنيفات ================= -->
+  <section class="view" id="view-lookups">
+    <div class="lookup-grid">
+      <div class="card">
+        <h2>الجهات</h2>
+        <div class="lookup-add">
+          <input id="newEntity" placeholder="اسم جهة جديدة...">
+          <button class="btn primary" onclick="app.addLookup('entities')">إضافة</button>
+        </div>
+        <ul class="lookup" id="entityList"></ul>
+      </div>
+      <div class="card">
+        <h2>التصنيفات</h2>
+        <div class="lookup-add">
+          <input id="newCategory" placeholder="اسم تصنيف جديد...">
+          <button class="btn primary" onclick="app.addLookup('categories')">إضافة</button>
+        </div>
+        <ul class="lookup" id="categoryList"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= النسخ الاحتياطي والسجل ================= -->
+  <section class="view" id="view-backup">
+    <div class="card">
+      <h2>النسخ الاحتياطي</h2>
+      <div class="toolbar" style="margin-bottom:6px">
+        <button class="btn primary" onclick="app.exportJSON()">&#11123; تصدير نسخة احتياطية كاملة</button>
+        <button class="btn" onclick="document.getElementById('importFile').click()">&#11121; استيراد نسخة احتياطية</button>
+        <input type="file" id="importFile" accept=".json" style="display:none">
+        <button class="btn" onclick="app.exportExcel()">تصدير السجل إلى Excel</button>
+        <span class="spacer"></span>
+        <button class="btn danger" onclick="app.wipeAll()">مسح جميع البيانات</button>
+      </div>
+      <div class="hint">
+        النسخة الاحتياطية ملف واحد يحوي كل شيء (المكاتبات والجهات والتصنيفات وسجل الحركة).
+        احفظه في مكان آمن — واستعده في أي وقت أو على أي جهاز آخر من زر الاستيراد.
+      </div>
+    </div>
+    <div class="card">
+      <h2>سجل الحركة (آخر 200 عملية)</h2>
+      <div class="table-wrap"><table id="auditTable">
+        <thead><tr><th>الوقت</th><th>العملية</th><th>المكاتبة</th><th>تفاصيل</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </section>
+</main>
+
+<!-- ================= نافذة المكاتبة ================= -->
+<div class="overlay" id="recOverlay">
+  <div class="modal">
+    <header>
+      <h3 id="modalTitle">مكاتبة جديدة</h3>
+      <button class="btn mini" onclick="app.closeModal()">&#10005; إغلاق</button>
+    </header>
+    <div class="body">
+      <form id="recForm" onsubmit="return false">
+        <div class="grid2">
+          <div class="field"><label>رقم المكاتبة *</label><input id="f_refNumber" required></div>
+          <div class="field"><label>تاريخ المكاتبة</label><input type="date" id="f_corrDate"></div>
+          <div class="field"><label>النوع</label>
+            <select id="f_type"><option>وارد</option><option>صادر</option></select></div>
+          <div class="field"><label>الأولوية</label>
+            <select id="f_priority"><option>عادي</option><option>هام</option><option>عاجل</option><option>سري</option></select></div>
+          <div class="field"><label>التصنيف</label><select id="f_categoryId"></select></div>
+          <div class="field"><label>الحالة</label>
+            <select id="f_status"><option>جديد</option><option>قيد الإجراء</option><option>منجز</option><option>محفوظ</option></select></div>
+          <div class="field"><label>الجهة</label><select id="f_entityId"></select></div>
+          <div class="field"><label>تاريخ الاستحقاق</label><input type="date" id="f_dueDate"></div>
+          <div class="field full"><label>الموضوع</label><input id="f_subject"></div>
+          <div class="field"><label>رقم الإشارة / الرد</label><input id="f_replyRef"></div>
+          <div class="field"><label>مسار الملف المرفق</label><input id="f_filePath" placeholder="مثال: D:\مكاتبات\245.pdf"></div>
+          <div class="field full"><label>ملاحظات</label><textarea id="f_notes"></textarea></div>
+        </div>
+      </form>
+    </div>
+    <footer>
+      <button class="btn primary" onclick="app.saveRecord()">&#128190; حفظ</button>
+      <button class="btn" onclick="app.saveRecord(true)">حفظ وجديد</button>
+      <button class="btn danger" id="btnDelete" onclick="app.deleteRecord()">&#128465;&#65039; حذف</button>
+      <span class="spacer"></span>
+      <button class="btn" id="btnPrevRec" onclick="app.navRecord(-1)">&#9654; السابق</button>
+      <span class="counter" id="recCounter"></span>
+      <button class="btn" id="btnNextRec" onclick="app.navRecord(1)">التالي &#9664;</button>
+    </footer>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="printReport"></div>
+
+<script>
+"use strict";
+/* ==========================================================
+   نظام إدارة المكاتبات - تطبيق ويب بملف واحد
+   التخزين: IndexedDB (مع بديل localStorage تلقائياً)
+   ملاحظة للمطور: بنية الإعدادات (settings) تحتجز مكاناً لإضافة
+   كلمة مرور وصلاحيات لاحقاً دون تغيير بنية البيانات.
+   ========================================================== */
+
+/* ---------------- طبقة التخزين ---------------- */
+const DB_NAME = "corrDB", DB_VER = 1;
+const STORES = ["records","categories","entities","audit","settings"];
+
+const storage = {
+  db: null, useLS: false,
+  async init(){
+    try{
+      this.db = await new Promise((res, rej) => {
+        const rq = indexedDB.open(DB_NAME, DB_VER);
+        rq.onupgradeneeded = e => {
+          const d = e.target.result;
+          STORES.forEach(s => { if(!d.objectStoreNames.contains(s)) d.createObjectStore(s, {keyPath:"id"}); });
+        };
+        rq.onsuccess = e => res(e.target.result);
+        rq.onerror = () => rej(rq.error);
+      });
+    }catch(err){
+      console.warn("IndexedDB غير متاح، سيتم استخدام localStorage", err);
+      this.useLS = true;
+    }
+  },
+  async getAll(store){
+    if(this.useLS) return JSON.parse(localStorage.getItem(DB_NAME+"_"+store) || "[]");
+    return new Promise((res, rej) => {
+      const rq = this.db.transaction(store).objectStore(store).getAll();
+      rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+    });
+  },
+  async put(store, obj){
+    if(this.useLS){
+      const arr = await this.getAll(store);
+      const i = arr.findIndex(x => x.id === obj.id);
+      if(i >= 0) arr[i] = obj; else arr.push(obj);
+      localStorage.setItem(DB_NAME+"_"+store, JSON.stringify(arr));
+      return;
+    }
+    return new Promise((res, rej) => {
+      const tx = this.db.transaction(store, "readwrite");
+      tx.objectStore(store).put(obj);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  },
+  async del(store, id){
+    if(this.useLS){
+      const arr = (await this.getAll(store)).filter(x => x.id !== id);
+      localStorage.setItem(DB_NAME+"_"+store, JSON.stringify(arr));
+      return;
+    }
+    return new Promise((res, rej) => {
+      const tx = this.db.transaction(store, "readwrite");
+      tx.objectStore(store).delete(id);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  },
+  async clear(store){
+    if(this.useLS){ localStorage.removeItem(DB_NAME+"_"+store); return; }
+    return new Promise((res, rej) => {
+      const tx = this.db.transaction(store, "readwrite");
+      tx.objectStore(store).clear();
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  }
+};
+
+/* ---------------- الحالة العامة ---------------- */
+const state = {
+  records: [], categories: [], entities: [], audit: [],
+  settings: { id:"app", schemaVersion:1, changesSinceBackup:0, auth:null /* مستقبلاً: كلمة المرور */ },
+  view: "dashboard",
+  q: "", fType: "", fCat: "", fStatus: "",
+  sortBy: "corrDate", sortDir: -1,
+  page: 1, perPage: 25,
+  editingId: null, filteredIds: [], dirty: false
+};
+
+const $ = id => document.getElementById(id);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const today = () => new Date().toISOString().slice(0, 10);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtDate = d => d ? d.replaceAll("-", "/") : "—";
+
+function catName(id){ const c = state.categories.find(x => x.id === id); return c ? c.name : "—"; }
+function entName(id){ const e = state.entities.find(x => x.id === id); return e ? e.name : "—"; }
+function isLate(r){ return r.status !== "منجز" && r.dueDate && r.dueDate < today(); }
+
+function statusBadge(r){
+  const map = {"جديد":"b-new","قيد الإجراء":"b-progress","منجز":"b-done","محفوظ":"b-archived"};
+  let h = `<span class="badge ${map[r.status]||"b-archived"}">${esc(r.status)}</span>`;
+  if(isLate(r)) h += ` <span class="badge b-late">&#9888;&#65039; متأخرة</span>`;
+  return h;
+}
+function typeBadge(t){ return `<span class="badge ${t === "وارد" ? "b-in" : "b-out"}">${esc(t)}</span>`; }
+
+/* ---------------- التطبيق ---------------- */
+const app = {
+
+  async start(){
+    await storage.init();
+    for(const s of ["records","categories","entities","audit"]) state[s] = await storage.getAll(s);
+    const st = (await storage.getAll("settings"))[0];
+    if(st) state.settings = st;
+    if(state.records.length === 0 && state.categories.length === 0) await this.seed();
+    this.bindEvents();
+    this.renderAll();
+  },
+
+  /* ----- بيانات أولية عند أول تشغيل ----- */
+  async seed(){
+    const cats = ["تعاميم","قرارات إدارية","خطابات رسمية","مذكرات داخلية","عقود واتفاقيات","شؤون الموظفين","الشؤون المالية","أخرى"]
+      .map(name => ({id: uid()+name.length, name}));
+    const ents = [
+      {name:"ديوان المحافظة", contact:"هاتف: 0112345678"},
+      {name:"وزارة المالية", contact:"هاتف: 0119876543"},
+      {name:"إدارة الموارد البشرية", contact:"داخلي: 105"},
+      {name:"الشؤون القانونية", contact:"داخلي: 210"},
+      {name:"شركة الاتصالات", contact:""}
+    ].map(e => ({id: uid()+e.name.length, ...e}));
+    const D = n => { const d = new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+    const samples = [
+      ["245/و/26", D(-20), "وارد", 2, 0, "طلب موافاة ببيانات الموظفين المنتدبين", "عادي", "منجز", D(-15), "112/ص/26"],
+      ["112/ص/26", D(-18), "صادر", 2, 0, "الرد على طلب بيانات الموظفين المنتدبين", "عادي", "منجز", "", ""],
+      ["246/و/26", D(-10), "وارد", 0, 1, "تعميم بشأن مواعيد العمل الرسمية", "هام", "محفوظ", "", ""],
+      ["247/و/26", D(-6), "وارد", 4, 4, "مسودة عقد صيانة أجهزة الحاسب الآلي للاعتماد", "عاجل", "قيد الإجراء", D(2), ""],
+      ["113/ص/26", D(-3), "صادر", 3, 2, "مذكرة بشأن تحديث لائحة الجزاءات الإدارية", "عادي", "قيد الإجراء", D(7), ""],
+      ["248/و/26", D(-15), "وارد", 6, 1, "مطالبة مالية مستحقة عن الربع الأول", "عاجل", "قيد الإجراء", D(-4), ""]
+    ].map(([refNumber, corrDate, type, ci, ei, subject, priority, status, dueDate, replyRef]) => ({
+      id: uid()+refNumber.length, refNumber, corrDate, type,
+      categoryId: cats[ci].id, entityId: ents[ei].id,
+      subject, priority, status, dueDate, replyRef,
+      filePath: "", notes: "", createdAt: new Date().toISOString(), updatedAt: ""
+    }));
+    for(const c of cats) await storage.put("categories", c);
+    for(const e of ents) await storage.put("entities", e);
+    for(const r of samples) await storage.put("records", r);
+    state.categories = cats; state.entities = ents; state.records = samples;
+    await this.log("تهيئة", "", "إنشاء البيانات الأولية للتجربة");
+  },
+
+  /* ----- الأحداث ----- */
+  bindEvents(){
+    document.querySelectorAll(".tabs button").forEach(b =>
+      b.onclick = () => this.switchView(b.dataset.view));
+    $("q").oninput = e => { state.q = e.target.value; state.page = 1; this.renderRecords(); };
+    $("fType").onchange = e => { state.fType = e.target.value; state.page = 1; this.renderRecords(); };
+    $("fCat").onchange = e => { state.fCat = e.target.value; state.page = 1; this.renderRecords(); };
+    $("fStatus").onchange = e => { state.fStatus = e.target.value; state.page = 1; this.renderRecords(); };
+    document.querySelectorAll("#recTable th.sortable").forEach(th =>
+      th.onclick = () => this.sortBy(th.dataset.sort));
+    $("importFile").onchange = e => this.importJSON(e.target.files[0]);
+    $("recForm").addEventListener("input", () => state.dirty = true);
+    document.addEventListener("keydown", e => {
+      if(e.key === "Escape") this.closeModal();
+    });
+  },
+
+  switchView(v){
+    state.view = v;
+    document.querySelectorAll(".tabs button").forEach(b =>
+      b.classList.toggle("active", b.dataset.view === v));
+    document.querySelectorAll(".view").forEach(s =>
+      s.classList.toggle("active", s.id === "view-"+v));
+    this.renderAll();
+  },
+
+  gotoRecords(mode){
+    this.clearFilters(true);
+    if(mode === "late") state.fStatus = "__late__";
+    this.switchView("records");
+    $("fStatus").value = state.fStatus;
+  },
+
+  /* ----- العرض ----- */
+  renderAll(){
+    this.renderStats();
+    this.renderRecent();
+    this.renderMonthly();
+    this.renderFilterCombos();
+    this.renderRecords();
+    this.renderLookups();
+    this.renderAudit();
+    $("backupBanner").classList.toggle("show", (state.settings.changesSinceBackup||0) >= 25);
+  },
+
+  renderStats(){
+    $("statAll").textContent = state.records.length;
+    $("statIn").textContent = state.records.filter(r => r.type === "وارد").length;
+    $("statOut").textContent = state.records.filter(r => r.type === "صادر").length;
+    $("statLate").textContent = state.records.filter(isLate).length;
+  },
+
+  renderRecent(){
+    const rows = [...state.records]
+      .sort((a,b) => (b.corrDate||"").localeCompare(a.corrDate||"")).slice(0,5);
+    $("recentTable").querySelector("tbody").innerHTML = rows.length ? rows.map(r => `
+      <tr onclick="app.editRecord('${r.id}')">
+        <td>${esc(r.refNumber)}</td><td>${fmtDate(r.corrDate)}</td>
+        <td>${typeBadge(r.type)}</td><td>${esc(entName(r.entityId))}</td>
+        <td>${esc(r.subject)}</td><td>${statusBadge(r)}</td>
+      </tr>`).join("") : `<tr><td colspan="6" class="empty">لا توجد مكاتبات بعد</td></tr>`;
+  },
+
+  renderMonthly(){
+    const m = {};
+    state.records.forEach(r => {
+      if(!r.corrDate) return;
+      const k = r.corrDate.slice(0,7);
+      m[k] = m[k] || {in:0, out:0};
+      r.type === "وارد" ? m[k].in++ : m[k].out++;
+    });
+    const keys = Object.keys(m).sort().reverse().slice(0,12);
+    $("monthlyTable").querySelector("tbody").innerHTML = keys.length ? keys.map(k => `
+      <tr><td>${k.replace("-","/")}</td><td>${m[k].in}</td><td>${m[k].out}</td><td>${m[k].in+m[k].out}</td></tr>`
+    ).join("") : `<tr><td colspan="4" class="empty">لا توجد بيانات</td></tr>`;
+  },
+
+  renderFilterCombos(){
+    const cur = state.fCat;
+    $("fCat").innerHTML = `<option value="">كل التصنيفات</option>` +
+      state.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+    $("fCat").value = cur;
+  },
+
+  filteredRecords(){
+    const q = state.q.trim().toLowerCase();
+    let rows = state.records.filter(r => {
+      if(state.fType && r.type !== state.fType) return false;
+      if(state.fCat && r.categoryId !== state.fCat) return false;
+      if(state.fStatus === "__late__"){ if(!isLate(r)) return false; }
+      else if(state.fStatus && r.status !== state.fStatus) return false;
+      if(q){
+        const hay = [r.refNumber, r.subject, r.notes, r.replyRef, entName(r.entityId), catName(r.categoryId)]
+          .join(" ").toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    });
+    rows.sort((a,b) => String(a[state.sortBy]||"").localeCompare(String(b[state.sortBy]||""), "ar") * state.sortDir);
+    return rows;
+  },
+
+  sortBy(field){
+    if(state.sortBy === field) state.sortDir *= -1;
+    else { state.sortBy = field; state.sortDir = field === "corrDate" || field === "dueDate" ? -1 : 1; }
+    this.renderRecords();
+  },
+
+  renderRecords(){
+    const rows = this.filteredRecords();
+    state.filteredIds = rows.map(r => r.id);
+    const pages = Math.max(1, Math.ceil(rows.length / state.perPage));
+    if(state.page > pages) state.page = pages;
+    const slice = rows.slice((state.page-1)*state.perPage, state.page*state.perPage);
+
+    document.querySelectorAll("#recTable th.sortable").forEach(th => {
+      th.querySelector(".arrow").textContent =
+        th.dataset.sort === state.sortBy ? (state.sortDir === 1 ? "▲" : "▼") : "";
+    });
+
+    $("recTable").querySelector("tbody").innerHTML = slice.length ? slice.map(r => `
+      <tr onclick="app.editRecord('${r.id}')">
+        <td>${esc(r.refNumber)}</td>
+        <td>${fmtDate(r.corrDate)}</td>
+        <td>${typeBadge(r.type)}</td>
+        <td>${esc(catName(r.categoryId))}</td>
+        <td>${esc(entName(r.entityId))}</td>
+        <td>${esc(r.subject)}</td>
+        <td>${esc(r.priority)}</td>
+        <td>${statusBadge(r)}</td>
+        <td>${fmtDate(r.dueDate)}</td>
+      </tr>`).join("")
+      : `<tr><td colspan="9" class="empty">لا توجد نتائج مطابقة</td></tr>`;
+
+    $("pager").innerHTML = rows.length ? `
+      <button class="btn mini" ${state.page<=1?"disabled":""} onclick="app.setPage(${state.page-1})">السابق</button>
+      <span>صفحة ${state.page} من ${pages} — ${rows.length} مكاتبة</span>
+      <button class="btn mini" ${state.page>=pages?"disabled":""} onclick="app.setPage(${state.page+1})">التالي</button>` : "";
+  },
+
+  setPage(p){ state.page = p; this.renderRecords(); },
+
+  clearFilters(silent){
+    state.q = state.fType = state.fCat = state.fStatus = "";
+    state.page = 1;
+    $("q").value = ""; $("fType").value = ""; $("fCat").value = ""; $("fStatus").value = "";
+    if(!silent) this.renderRecords();
+  },
+
+  /* ----- نافذة المكاتبة ----- */
+  fillFormCombos(){
+    $("f_categoryId").innerHTML = `<option value="">—</option>` +
+      state.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+    $("f_entityId").innerHTML = `<option value="">—</option>` +
+      state.entities.map(e => `<option value="${e.id}">${esc(e.name)}</option>`).join("");
+  },
+
+  newRecord(){
+    this.fillFormCombos();
+    state.editingId = null; state.dirty = false;
+    $("modalTitle").textContent = "مكاتبة جديدة";
+    $("recForm").reset();
+    $("f_corrDate").value = today();
+    $("f_type").value = "وارد"; $("f_priority").value = "عادي"; $("f_status").value = "قيد الإجراء";
+    $("btnDelete").style.display = "none";
+    $("btnPrevRec").style.display = $("btnNextRec").style.display = "none";
+    $("recCounter").textContent = "";
+    $("recOverlay").classList.add("open");
+    $("f_refNumber").focus();
+  },
+
+  editRecord(id){
+    const r = state.records.find(x => x.id === id);
+    if(!r) return;
+    this.fillFormCombos();
+    state.editingId = id; state.dirty = false;
+    $("modalTitle").textContent = "تعديل مكاتبة: " + r.refNumber;
+    ["refNumber","corrDate","type","priority","categoryId","status","entityId","dueDate","subject","replyRef","filePath","notes"]
+      .forEach(k => $("f_"+k).value = r[k] ?? "");
+    $("btnDelete").style.display = "";
+    $("btnPrevRec").style.display = $("btnNextRec").style.display = "";
+    const i = state.filteredIds.indexOf(id);
+    $("recCounter").textContent = i >= 0 ? `سجل ${i+1} من ${state.filteredIds.length}` : "";
+    $("recOverlay").classList.add("open");
+  },
+
+  navRecord(dir){
+    if(state.dirty && !confirm("لديك تعديلات غير محفوظة، هل تريد تجاهلها والانتقال؟")) return;
+    const i = state.filteredIds.indexOf(state.editingId);
+    const next = state.filteredIds[i + dir];
+    if(next) this.editRecord(next);
+  },
+
+  closeModal(){
+    if(state.dirty && !confirm("لديك تعديلات غير محفوظة، هل تريد الإغلاق بدون حفظ؟")) return;
+    $("recOverlay").classList.remove("open");
+    state.editingId = null; state.dirty = false;
+  },
+
+  async saveRecord(andNew){
+    const refNumber = $("f_refNumber").value.trim();
+    if(!refNumber){ this.toast("رقم المكاتبة حقل إلزامي"); $("f_refNumber").focus(); return; }
+    const data = {
+      refNumber,
+      corrDate: $("f_corrDate").value, type: $("f_type").value,
+      priority: $("f_priority").value, categoryId: $("f_categoryId").value,
+      status: $("f_status").value, entityId: $("f_entityId").value,
+      dueDate: $("f_dueDate").value, subject: $("f_subject").value.trim(),
+      replyRef: $("f_replyRef").value.trim(), filePath: $("f_filePath").value.trim(),
+      notes: $("f_notes").value.trim()
+    };
+    if(state.editingId){
+      const r = state.records.find(x => x.id === state.editingId);
+      Object.assign(r, data, {updatedAt: new Date().toISOString()});
+      await storage.put("records", r);
+      await this.log("تعديل", refNumber, data.subject);
+    } else {
+      const r = {id: uid(), ...data, createdAt: new Date().toISOString(), updatedAt: ""};
+      state.records.push(r);
+      await storage.put("records", r);
+      await this.log("إضافة", refNumber, data.subject);
+    }
+    await this.bumpChanges();
+    state.dirty = false;
+    this.toast("تم الحفظ بنجاح ✓");
+    this.renderAll();
+    if(andNew) this.newRecord();
+    else $("recOverlay").classList.remove("open");
+  },
+
+  async deleteRecord(){
+    if(!state.editingId) return;
+    const r = state.records.find(x => x.id === state.editingId);
+    if(!confirm(`هل أنت متأكد من حذف المكاتبة "${r.refNumber}" نهائياً؟`)) return;
+    state.records = state.records.filter(x => x.id !== state.editingId);
+    await storage.del("records", state.editingId);
+    await this.log("حذف", r.refNumber, r.subject);
+    await this.bumpChanges();
+    state.editingId = null; state.dirty = false;
+    $("recOverlay").classList.remove("open");
+    this.toast("تم حذف المكاتبة");
+    this.renderAll();
+  },
+
+  /* ----- الجهات والتصنيفات ----- */
+  renderLookups(){
+    const usage = (key, id) => state.records.filter(r => r[key] === id).length;
+    $("entityList").innerHTML = state.entities.map(e => `
+      <li><span class="nm">${esc(e.name)}</span>
+        <span class="cnt">${usage("entityId", e.id)} مكاتبة</span>
+        <button class="btn mini" onclick="app.renameLookup('entities','${e.id}')">تعديل</button>
+        <button class="btn mini danger" onclick="app.deleteLookup('entities','${e.id}')">حذف</button></li>`).join("")
+      || `<li class="empty">لا توجد جهات</li>`;
+    $("categoryList").innerHTML = state.categories.map(c => `
+      <li><span class="nm">${esc(c.name)}</span>
+        <span class="cnt">${usage("categoryId", c.id)} مكاتبة</span>
+        <button class="btn mini" onclick="app.renameLookup('categories','${c.id}')">تعديل</button>
+        <button class="btn mini danger" onclick="app.deleteLookup('categories','${c.id}')">حذف</button></li>`).join("")
+      || `<li class="empty">لا توجد تصنيفات</li>`;
+  },
+
+  async addLookup(store){
+    const input = store === "entities" ? $("newEntity") : $("newCategory");
+    const name = input.value.trim();
+    if(!name) return;
+    const obj = {id: uid(), name};
+    if(store === "entities") obj.contact = "";
+    state[store].push(obj);
+    await storage.put(store, obj);
+    await this.log("إضافة " + (store === "entities" ? "جهة" : "تصنيف"), name, "");
+    input.value = "";
+    this.renderAll();
+  },
+
+  async renameLookup(store, id){
+    const obj = state[store].find(x => x.id === id);
+    const name = prompt("الاسم الجديد:", obj.name);
+    if(!name || !name.trim()) return;
+    obj.name = name.trim();
+    await storage.put(store, obj);
+    this.renderAll();
+  },
+
+  async deleteLookup(store, id){
+    const key = store === "entities" ? "entityId" : "categoryId";
+    const used = state.records.filter(r => r[key] === id).length;
+    const obj = state[store].find(x => x.id === id);
+    if(!confirm(used
+      ? `"${obj.name}" مستخدم في ${used} مكاتبة — الحذف سيجعل حقلها فارغاً. متابعة؟`
+      : `حذف "${obj.name}"؟`)) return;
+    state[store] = state[store].filter(x => x.id !== id);
+    await storage.del(store, id);
+    for(const r of state.records.filter(r => r[key] === id)){
+      r[key] = "";
+      await storage.put("records", r);
+    }
+    await this.log("حذف " + (store === "entities" ? "جهة" : "تصنيف"), obj.name, "");
+    this.renderAll();
+  },
+
+  /* ----- سجل الحركة ----- */
+  async log(action, ref, details){
+    const entry = {id: uid(), ts: new Date().toISOString(), action, ref, details: (details||"").slice(0,120)};
+    state.audit.push(entry);
+    await storage.put("audit", entry);
+    // الاحتفاظ بآخر 1000 عملية فقط
+    while(state.audit.length > 1000){
+      const old = state.audit.shift();
+      await storage.del("audit", old.id);
+    }
+  },
+
+  renderAudit(){
+    const rows = [...state.audit].reverse().slice(0, 200);
+    $("auditTable").querySelector("tbody").innerHTML = rows.length ? rows.map(a => `
+      <tr style="cursor:default">
+        <td>${new Date(a.ts).toLocaleString("ar-EG-u-nu-latn")}</td>
+        <td>${esc(a.action)}</td><td>${esc(a.ref)}</td><td>${esc(a.details)}</td>
+      </tr>`).join("") : `<tr><td colspan="4" class="empty">لا توجد عمليات مسجلة</td></tr>`;
+  },
+
+  async bumpChanges(){
+    state.settings.changesSinceBackup = (state.settings.changesSinceBackup || 0) + 1;
+    await storage.put("settings", state.settings);
+  },
+
+  /* ----- النسخ الاحتياطي ----- */
+  async exportJSON(){
+    const payload = {
+      app: "corr-manager", version: 1, exportedAt: new Date().toISOString(),
+      records: state.records, categories: state.categories,
+      entities: state.entities, audit: state.audit
+    };
+    this.download(
+      "نسخة-احتياطية-المكاتبات-" + today() + ".json",
+      new Blob([JSON.stringify(payload, null, 1)], {type: "application/json"})
+    );
+    state.settings.changesSinceBackup = 0;
+    await storage.put("settings", state.settings);
+    $("backupBanner").classList.remove("show");
+    this.toast("تم تصدير النسخة الاحتياطية");
+  },
+
+  async importJSON(file){
+    if(!file) return;
+    try{
+      const data = JSON.parse(await file.text());
+      if(data.app !== "corr-manager" || !Array.isArray(data.records))
+        throw new Error("ملف غير صالح");
+      if(!confirm(`سيتم استبدال البيانات الحالية (${state.records.length} مكاتبة) ` +
+                  `ببيانات النسخة (${data.records.length} مكاتبة). متابعة؟`)) return;
+      for(const s of ["records","categories","entities","audit"]){
+        await storage.clear(s);
+        state[s] = data[s] || [];
+        for(const o of state[s]) await storage.put(s, o);
+      }
+      await this.log("استيراد", "", "استعادة نسخة احتياطية من " + (data.exportedAt||"").slice(0,10));
+      this.toast("تمت الاستعادة بنجاح ✓");
+      this.renderAll();
+    }catch(e){
+      alert("تعذر الاستيراد: الملف ليس نسخة احتياطية صالحة.");
+    }
+    $("importFile").value = "";
+  },
+
+  exportExcel(){
+    const rows = this.filteredRecords();
+    const head = ["رقم المكاتبة","التاريخ","النوع","التصنيف","الجهة","الموضوع","الأولوية","الحالة","تاريخ الاستحقاق","رقم الإشارة","ملاحظات"];
+    const html = `<html dir="rtl"><head><meta charset="utf-8"></head><body><table border="1">
+      <tr>${head.map(h => "<th>"+h+"</th>").join("")}</tr>
+      ${rows.map(r => "<tr>" + [
+        r.refNumber, fmtDate(r.corrDate), r.type, catName(r.categoryId), entName(r.entityId),
+        r.subject, r.priority, r.status + (isLate(r) ? " (متأخرة)" : ""), fmtDate(r.dueDate), r.replyRef, r.notes
+      ].map(v => "<td>"+esc(v)+"</td>").join("") + "</tr>").join("")}
+    </table></body></html>`;
+    this.download("سجل-المكاتبات-" + today() + ".xls",
+      new Blob(["﻿" + html], {type: "application/vnd.ms-excel"}));
+    this.toast("تم تصدير ملف Excel");
+  },
+
+  download(name, blob){
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  },
+
+  async wipeAll(){
+    if(!confirm("تحذير: سيتم مسح جميع البيانات نهائياً!\nهل أخذت نسخة احتياطية؟")) return;
+    if(prompt('للتأكيد اكتب كلمة: مسح') !== "مسح"){ this.toast("تم الإلغاء"); return; }
+    for(const s of STORES) await storage.clear(s);
+    state.records = []; state.categories = []; state.entities = []; state.audit = [];
+    state.settings.changesSinceBackup = 0;
+    this.toast("تم مسح جميع البيانات");
+    this.renderAll();
+  },
+
+  /* ----- الطباعة ----- */
+  printReport(){
+    const rows = this.filteredRecords();
+    const filters = [];
+    if(state.fType) filters.push("النوع: " + state.fType);
+    if(state.fCat) filters.push("التصنيف: " + catName(state.fCat));
+    if(state.fStatus) filters.push("الحالة: " + (state.fStatus === "__late__" ? "المتأخرة" : state.fStatus));
+    if(state.q.trim()) filters.push("بحث: " + state.q.trim());
+    $("printReport").innerHTML = `
+      <h1>تقرير سجل المكاتبات</h1>
+      <div class="meta">
+        تاريخ الطباعة: ${new Date().toLocaleString("ar-EG-u-nu-latn")}
+        — عدد المكاتبات: ${rows.length}
+        ${filters.length ? "— التصفية: " + esc(filters.join(" | ")) : ""}
+      </div>
+      <table>
+        <tr><th>الرقم</th><th>التاريخ</th><th>النوع</th><th>التصنيف</th><th>الجهة</th><th>الموضوع</th><th>الحالة</th><th>الاستحقاق</th></tr>
+        ${rows.map(r => `<tr>
+          <td>${esc(r.refNumber)}</td><td>${fmtDate(r.corrDate)}</td><td>${esc(r.type)}</td>
+          <td>${esc(catName(r.categoryId))}</td><td>${esc(entName(r.entityId))}</td>
+          <td>${esc(r.subject)}</td><td>${esc(r.status)}${isLate(r) ? " (متأخرة)" : ""}</td>
+          <td>${fmtDate(r.dueDate)}</td>
+        </tr>`).join("")}
+      </table>`;
+    window.print();
+  },
+
+  /* ----- رسائل ----- */
+  toast(msg){
+    const t = $("toast");
+    t.textContent = msg;
+    t.style.display = "block";
+    clearTimeout(t._h);
+    t._h = setTimeout(() => t.style.display = "none", 2500);
+  }
+};
+
+app.start();
+</script>
+</body>
+</html>
