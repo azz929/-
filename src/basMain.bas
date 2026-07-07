@@ -17,11 +17,7 @@ Public Sub BuildAll()
     On Error GoTo ErrH
     DoCmd.Hourglass True
 
-    Build_Tables      ' الجداول + العلاقات + البيانات الأولية
-    Build_Queries     ' الاستعلامات الجاهزة
-    Build_Forms       ' النماذج وأزرار التنقل
-    Build_Report      ' تقرير الطباعة
-    SetStartupForm "frmMain"
+    BuildCore
 
     DoCmd.Hourglass False
     MsgBox "تم بناء نظام إدارة المكاتبات بنجاح." & vbCrLf & vbCrLf & _
@@ -35,6 +31,20 @@ ErrH:
     DoCmd.Hourglass False
     MsgBox "حدث خطأ أثناء البناء:" & vbCrLf & _
            Err.Number & " - " & Err.Description, vbCritical, "خطأ"
+End Sub
+
+' بناء صامت (بدون رسائل) - يُستدعى من سكربت Build-Accdb.ps1
+Public Sub BuildAllSilent()
+    BuildCore
+End Sub
+
+' خطوات البناء المشتركة
+Private Sub BuildCore()
+    Build_Tables      ' الجداول + العلاقات + البيانات الأولية
+    Build_Queries     ' الاستعلامات الجاهزة
+    Build_Forms       ' النماذج وأزرار التنقل
+    Build_Report      ' تقرير الطباعة
+    SetStartupForm "frmMain"
 End Sub
 
 '================= أدوات مساعدة عامة =========================
